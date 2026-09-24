@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
-      const response = await fetch("/activities");
+      const response = await fetch("/activities", { cache: "no-store" });
       const activities = await response.json();
 
       // Clear loading message and previous dropdown options
@@ -31,7 +31,22 @@ document.addEventListener("DOMContentLoaded", () => {
         const participantsHTML =
           details.participants.length > 0
             ? `<ul>${details.participants
-                .map((participant) => `<li>${escapeHTML(participant)}</li>`)
+                .map(
+                  (participant) => `
+                    <li class="participant-item">
+                      <span class="participant-email">${escapeHTML(participant)}</span>
+                      <button
+                        type="button"
+                        class="participant-delete"
+                        data-activity="${escapeHTML(name)}"
+                        data-email="${escapeHTML(participant)}"
+                        aria-label="Remove ${escapeHTML(participant)} from ${escapeHTML(name)}"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  `
+                )
                 .join("")}</ul>`
             : `<p class="no-participants">No participants yet</p>`;
 
@@ -60,6 +75,45 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  activitiesList.addEventListener("click", async (event) => {
+    const deleteButton = event.target.closest(".participant-delete");
+    if (!deleteButton) return;
+
+    const email = deleteButton.dataset.email;
+    const activityName = deleteButton.dataset.activity;
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/signup?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+          cache: "no-store",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "An error occurred";
+        messageDiv.className = "error";
+      }
+
+      messageDiv.classList.remove("hidden");
+      setTimeout(() => {
+        messageDiv.classList.add("hidden");
+      }, 5000);
+    } catch (error) {
+      messageDiv.textContent = "Failed to remove the participant.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error removing participant:", error);
+    }
+  });
+
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -72,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `/activities/${encodeURIComponent(activity)}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          cache: "no-store",
         }
       );
 
